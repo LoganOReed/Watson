@@ -40,13 +40,16 @@
         devShells.poetry = pkgs.mkShell {
           packages = [ pkgs.poetry ];
         };
-        watson-overlay = (final: prev: {
-          # The application
-          watson-personal = prev.poetry2nix.mkPoetryApplication {
-            projectDir = ./.;
-          };
-        });
-        overlays.default = self.watson-overlay;
+        
+        overlays = {
+          watson-overlay = (final: prev: {
+              # The application
+              watson-personal = prev.poetry2nix.mkPoetryApplication {
+                projectDir = ./.;
+              };
+            });
+          default = self.watson-overlay;
+        };
       });
 }
 
