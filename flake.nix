@@ -42,13 +42,12 @@
         };
         
         overlays = {
-          watson-overlay = (final: prev: {
+          default = (final: prev: {
               # The application
               watson-personal = prev.poetry2nix.mkPoetryApplication {
                 projectDir = ./.;
               };
             });
-          default = self.watson-overlay;
         };
       });
 }
