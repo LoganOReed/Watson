@@ -7,6 +7,7 @@ import uuid
 from configparser import Error as CFGParserError
 import arrow
 import click
+import subprocess
 
 from .config import ConfigParser
 from .frames import Frames
@@ -54,6 +55,7 @@ class Watson(object):
         self.frames_file = os.path.join(self._dir, 'frames')
         self.state_file = os.path.join(self._dir, 'state')
         self.last_sync_file = os.path.join(self._dir, 'last_sync')
+        self.sync_dir = os.path.join(self._dir, 'sync_repo')
 
         if 'frames' in kwargs:
             self.frames = kwargs['frames']
@@ -371,8 +373,25 @@ class Watson(object):
         return self._remote_projects['projects']
 
     def pull(self):
-        import requests
-        dest, headers = self._get_request_info('frames')
+        repo = self.config.get('backend', 'repo')
+        if repo:
+            # clone git repository if necessary
+            if not os.path.isdir(self.sync_dir):
+                sync_dir = self.sync_dir
+                subprocess.run(['git', 'clone', repo, sync_dir], check=True)
+
+            # git pull
+            subprocess.run(['git', 'pull'], cwd=self.sync_dir, check=True)
+            sync_file = os.path.join(self.sync_dir, 'frames')
+            try:
+                with open(sync_file, 'r') as f:
+                    frames = json.load(f)
+            except FileNotFoundError:
+                frames = []
+        else:
+            import requests
+            dest, headers = self._get_request_info('frames')
+
 
         try:
             response = requests.get(
@@ -387,27 +406,33 @@ class Watson(object):
                 "server: {}".format(response.json())
             )
 
-        frames = response.json() or ()
+            frames = response.json() or ()
+
+        updated_frames = 0
+
 
         for frame in frames:
             frame_id = uuid.UUID(frame['id']).hex
-            self.frames[frame_id] = (
-                frame['project'],
-                frame['begin_at'],
-                frame['end_at'],
-                frame['tags']
-            )
+            try:
+                self.frames[frame_id]
+            except KeyError:
+                updated_frames += 1
+                self.frames[frame_id] = (
+                    frame['project'],
+                    frame['begin_at'],
+                    frame['end_at'],
+                    frame['tags']
+                )
 
-        return frames
+        return updated_frames
 
     def push(self, last_pull):
-        import requests
-        dest, headers = self._get_request_info('frames/bulk')
 
         frames = []
 
-        for frame in self.frames:
-            if last_pull > frame.updated_at > self.last_sync:
+        repo = self.config.get('backend', 'repo')
+        if repo:
+            for frame in self.frames:
                 frames.append({
                     'id': uuid.UUID(frame.id).urn,
                     'begin_at': str(frame.start.to('utc')),
@@ -415,6 +440,7 @@ class Watson(object):
                     'project': frame.project,
                     'tags': frame.tags
                 })
+            frames.sort(key=lambda frame: frame['begin_at'])
 
         try:
             response = requests.post(dest, json.dumps(frames), headers=headers)
