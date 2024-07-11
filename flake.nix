@@ -46,11 +46,7 @@
             projectDir = ./.;
           };
         });
-        overlays = [self.watson-overlay];
-      })// 
-      {
-      # You can add this overlay to your NixOS configuration
-      overlays.default = self.watson-overlay;
-    };
+        overlays.default = self.watson-overlay;
+      });
 }
 
