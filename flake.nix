@@ -40,16 +40,17 @@
         devShells.poetry = pkgs.mkShell {
           packages = [ pkgs.poetry ];
         };
-        overlays = (final: prev: {
+        watson-overlay = (final: prev: {
           # The application
           watson-personal = prev.poetry2nix.mkPoetryApplication {
             projectDir = ./.;
           };
         });
+        overlays = [self.watson-overlay];
       })// 
       {
       # You can add this overlay to your NixOS configuration
-      overlays.default = self.overlays;
+      overlays.default = self.watson-overlay;
     };
 }
 
