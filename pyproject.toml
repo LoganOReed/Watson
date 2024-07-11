@@ -1,0 +1,34 @@
+[tool.poetry]
+name = "watson"
+version = "0.1.0"
+description = "A Nixxy Fork of Watson CLI"
+authors = ["Logan Reed <logan@loganreed.org>"]
+license = "MIT"
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = ">=3.9"
+arrow = "^1.3.0"
+click = "^8.1.7"
+click-didyoumean = "^0.3.1"
+requests = "^2.32.3"
+colorama = "^0.4.6"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.2.2"
+pytest-datafiles = "^3.0.0"
+pytest-mock = "^3.14.0"
+pytest-runner = "^6.0.1"
+flake8 = "^7.1.0"
+mkdocs = "^1.6.0"
+mkdocs-bootswatch = "^1.1"
+tox = "^4.16.0"
+
+[tool.poetry.scripts]
+watson = 'watson.__main__:cli'
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
