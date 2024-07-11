@@ -10,7 +10,7 @@
     };
   };
 
-  outputs = { self, nixpkgs, flake-utils, poetry2nix }:
+  outputs = inputs@{ self, nixpkgs, flake-utils, poetry2nix }:
     flake-utils.lib.eachDefaultSystem (system:
       let
         # see https://github.com/nix-community/poetry2nix/tree/master#api for more functions and examples.
@@ -49,7 +49,7 @@
               watson-personal = prev.poetry2nix.mkPoetryApplication {
                 projectDir = ./.;
               };
-            });
+            }) {inherit inputs;};
         };
 };
 }
