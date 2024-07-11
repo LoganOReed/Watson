@@ -43,14 +43,14 @@
         
 
       }) // {
-        overlays = {
-          default = (final: prev: {
+        overlays = [
+          (final: prev: {
               # The application
               watson-personal = prev.poetry2nix.mkPoetryApplication {
                 projectDir = ./.;
               };
-            }) {inherit inputs;};
-        };
+            }) 
+        ];
 };
 }
 
