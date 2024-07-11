@@ -41,6 +41,8 @@
           packages = [ pkgs.poetry ];
         };
         
+
+      }) // {
         overlays = {
           default = (final: prev: {
               # The application
@@ -49,6 +51,6 @@
               };
             });
         };
-      });
+};
 }
 
