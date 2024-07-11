@@ -30,7 +30,7 @@ class Watson(object):
                         frames.
                         If not given, the value is extracted
                         from the frames file.
-        :type frames: list
+        :type frames: list[Frames]
 
         :param current: If given, should be a dict representing the
                         current frame.
@@ -169,7 +169,7 @@ class Watson(object):
     @property
     def frames(self):
         if self._frames is None:
-            self.frames = self._load_json_file(self.frames_file, type=list)
+            self.frames = self._load_json_file(self.frames_file, type=list[Frames])
 
         return self._frames
 
@@ -373,6 +373,7 @@ class Watson(object):
         return self._remote_projects['projects']
 
     def pull(self):
+
         repo = self.config.get('backend', 'repo')
         if repo:
             # clone git repository if necessary
@@ -392,24 +393,22 @@ class Watson(object):
             import requests
             dest, headers = self._get_request_info('frames')
 
-
-        try:
-            response = requests.get(
-                dest, params={'last_sync': self.last_sync}, headers=headers
-            )
-            assert response.status_code == 200
-        except requests.ConnectionError:
-            raise WatsonError("Unable to reach the server.")
-        except AssertionError:
-            raise WatsonError(
-                "An error occurred with the remote "
-                "server: {}".format(response.json())
-            )
+            try:
+                response = requests.get(
+                    dest, params={'last_sync': self.last_sync}, headers=headers
+                )
+                assert response.status_code == 200
+            except requests.ConnectionError:
+                raise WatsonError("Unable to reach the server.")
+            except AssertionError:
+                raise WatsonError(
+                    "An error occurred with the remote "
+                    "server: {}".format(response.json())
+                )
 
             frames = response.json() or ()
 
         updated_frames = 0
-
 
         for frame in frames:
             frame_id = uuid.UUID(frame['id']).hex
@@ -429,7 +428,6 @@ class Watson(object):
     def push(self, last_pull):
 
         frames = []
-
         repo = self.config.get('backend', 'repo')
         if repo:
             for frame in self.frames:
@@ -442,21 +440,66 @@ class Watson(object):
                 })
             frames.sort(key=lambda frame: frame['begin_at'])
 
-        try:
-            response = requests.post(dest, json.dumps(frames), headers=headers)
-            assert response.status_code == 201
-        except requests.ConnectionError:
-            raise WatsonError("Unable to reach the server.")
-        except AssertionError:
-            raise WatsonError(
-                "An error occurred with the remote server (status: {}). "
-                "Response was:\n{}".format(
-                    response.status_code,
-                    response.text
-                )
-            )
+            # Get number of synced frames
+            sync_file = os.path.join(self.sync_dir, 'frames')
+            try:
+                with open(sync_file, 'r') as f:
+                    n_frames = len(json.load(f))
+            except FileNotFoundError:
+                n_frames = 0
 
-        return frames
+            # Write frames to repo
+            with open(sync_file, 'w') as f:
+                json.dump(frames, f, indent=2)
+
+            # Check if anything has changed
+            try:
+                command = ['git', 'diff', '--quiet']
+                subprocess.run(command, cwd=self.sync_dir, check=True)
+                return 0
+            except subprocess.CalledProcessError:
+                pass
+
+            # git push
+            cwd = self.sync_dir
+            updated = len(frames) - n_frames
+            msg = f'Add {updated} frames ({datetime.datetime.now()})'
+            subprocess.run(['git', 'add', 'frames'], cwd=cwd, check=True)
+            subprocess.run(['git', 'commit', '-m', msg], cwd=cwd, check=True)
+            subprocess.run(['git', 'push'], cwd=cwd, check=True)
+
+            return updated
+
+        else:
+            import requests
+            dest, headers = self._get_request_info('frames/bulk')
+
+            for frame in self.frames:
+                if last_pull > frame.updated_at > self.last_sync:
+                    frames.append({
+                        'id': uuid.UUID(frame.id).urn,
+                        'begin_at': str(frame.start.to('utc')),
+                        'end_at': str(frame.stop.to('utc')),
+                        'project': frame.project,
+                        'tags': frame.tags
+                    })
+
+            try:
+                body = json.dumps(frames)
+                response = requests.post(dest, body, headers=headers)
+                assert response.status_code == 201
+            except requests.ConnectionError:
+                raise WatsonError("Unable to reach the server.")
+            except AssertionError:
+                raise WatsonError(
+                    "An error occurred with the remote server (status: {}). "
+                    "Response was:\n{}".format(
+                        response.status_code,
+                        response.text
+                    )
+                )
+
+            return len(frames)
 
     def merge_report(self, frames_with_conflict):
         conflict_file_frames = Frames(self._load_json_file(
