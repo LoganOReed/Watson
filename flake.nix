@@ -19,8 +19,8 @@
       in
       {
         packages = {
-          myapp = mkPoetryApplication { projectDir = self; };
-          default = self.packages.${system}.myapp;
+          watson = mkPoetryApplication { projectDir = self; };
+          default = self.packages.${system}.watson;
         };
 
         # Shell for app dependencies.
@@ -29,7 +29,7 @@
         #
         # Use this shell for developing your app.
         devShells.default = pkgs.mkShell {
-          inputsFrom = [ self.packages.${system}.myapp ];
+          inputsFrom = [ self.packages.${system}.watson ];
         };
 
         # Shell for poetry.
@@ -40,5 +40,12 @@
         devShells.poetry = pkgs.mkShell {
           packages = [ pkgs.poetry ];
         };
+        overlays.default = (final: prev: {
+          # The application
+          watson-personal = prev.poetry2nix.mkPoetryApplication {
+            projectDir = ./.;
+          };
+        });
       });
 }
+
